@@ -1,0 +1,18 @@
+{
+    "https://example1.com": [
+      "https://example1.com/product/12345",
+      "https://example1.com/item/98765",
+      "https://example1.com/p/54321"
+    ],
+    "https://example2.com": [
+      "https://example2.com/product/67890",
+      "https://example2.com/item/45678",
+      "https://example2.com/p/11223"
+    ],
+    "https://example3.com": [
+      "https://example3.com/product/23456",
+      "https://example3.com/item/34567",
+      "https://example3.com/p/78901"
+    ]
+  }
+  
