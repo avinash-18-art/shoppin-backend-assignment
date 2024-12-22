@@ -1,13 +1,15 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
-const fs = require("fs");
-const { isProductURL, normalizeURL } = require("./utils");
+const axios = require('axios');
+const cheerio = require('cheerio');
+const { saveResults } = require('./utils/logger');
+const { fetchPage } = require('./utils/requestHandler');
+const { PRODUCT_PATTERNS } = require('./constants');
+const { extractProductURLs } = require('./urlExtractor');
 
-// Main crawler function
-const crawlDomain = async (domain) => {
+async function crawlDomain(domain) {
+  console.log(`Crawling domain: ${domain}`);
   const visited = new Set();
-  const productURLs = new Set();
   const queue = [domain];
+  const productURLs = new Set();
 
   while (queue.length > 0) {
     const currentURL = queue.shift();
@@ -16,48 +18,42 @@ const crawlDomain = async (domain) => {
     visited.add(currentURL);
 
     try {
-      console.log(`Crawling: ${currentURL}`);
-      const response = await axios.get(currentURL, { timeout: 10000 });
-      const $ = cheerio.load(response.data);
+      const html = await fetchPage(currentURL);
+      const $ = cheerio.load(html);
 
-      // Extract and process links on the page
-      $("a").each((_, element) => {
-        const href = $(element).attr("href");
-        if (!href) return;
+      // Extract product URLs
+      const productLinks = extractProductURLs($, PRODUCT_PATTERNS, domain);
+      productLinks.forEach((link) => productURLs.add(link));
 
-        const normalizedURL = normalizeURL(currentURL, href);
-        if (normalizedURL && !visited.has(normalizedURL)) {
-          if (isProductURL(normalizedURL)) {
-            productURLs.add(normalizedURL);
-          } else if (normalizedURL.startsWith(domain)) {
-            queue.push(normalizedURL);
-          }
+      // Add more links to the queue
+      $('a').each((_, element) => {
+        const href = $(element).attr('href');
+        if (href && !visited.has(href) && href.startsWith('/')) {
+          const fullURL = new URL(href, domain).href;
+          queue.push(fullURL);
         }
       });
     } catch (error) {
-      console.error(`Failed to crawl ${currentURL}:`, error.message);
+      console.error(`Error processing ${currentURL}: ${error.message}`);
     }
   }
 
   return Array.from(productURLs);
-};
+}
 
-// Main function to crawl multiple domains
-const crawlDomains = async (domains) => {
+async function crawlDomains(domains) {
   const results = {};
 
   for (const domain of domains) {
-    console.log(`Starting crawl for domain: ${domain}`);
-    const productURLs = await crawlDomain(domain);
-    results[domain] = productURLs;
+    results[domain] = await crawlDomain(domain);
   }
 
-  // Save results to a JSON file
-  fs.writeFileSync("./output/product_urls.json", JSON.stringify(results, null, 2));
-  console.log("Crawling completed. Results saved to ./output/product_urls.json");
-};
+  saveResults(results);
+}
 
-// Load domains from config file
-const domains = require("../config/domains.json");
+const domains = [
+  'https://example1.com',
+  'https://example2.com',
+];
 
-crawlDomains(domains);
+crawlDomains(domains).then(() => console.log('Crawling complete.'));
